@@ -1,23 +1,40 @@
-import express from 'express';
-import mysql from 'mysql2/promise';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { OAuth2Client } from 'google-auth-library';
-import cors from 'cors';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
-import dotenv from 'dotenv';
-import fetch from 'node-fetch';
-import nodemailer from 'nodemailer';
+const express = require('express');
+const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
+const cors = require('cors');
+const { MercadoPagoConfig, Preference } = require('mercadopago');
+const dotenv = require('dotenv');
+const fetch = require('node-fetch');
+const nodemailer = require('nodemailer');
 
 // Configurações iniciais
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ CONFIGURAÇÕES DO APP
+// ✅ CORS para produção - ACEITA TUDO (ajuste depois)
+const allowedOrigins = [
+  'https://https://petnet-app.netlify.app/', // Seu domínio do Netlify
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
-  credentials: true
+  origin: function (origin, callback) {
+    // Permite requisições sem origin (como apps mobile ou curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'A política CORS para este site não permite acesso da origem especificada.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true, // Importante para cookies/tokens
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
@@ -98,21 +115,21 @@ Pet shop completo com loja online, clínica veterinária, banho e tosa, vacinaç
 
 Sua missão: ajudar clientes a encontrar rapidamente o que precisam, sempre representando bem a marca!
 
-🏪 **SOBRE NOSSA EMPRESA:**
+🏪 SOBRE NOSSA EMPRESA:
 - Nome: Pet.Net
 - Endereço: Americana-SP.
 - Telefone: (19)99999-9999.
 - WhatsApp: (19)99999-9999.
 - Horário: das 07h às 18h (emergência 24h).
 
-🛁 **NOSSOS SERVIÇOS:**
+🛁 NOSSOS SERVIÇOS:
 • Banho e tosa - Pelo Longo: R$:50,00, Pelo Curto: R$40,00 e Tosa: R$45,00.
 • Consultas veterinárias - Consulta de rotina, exames e cirurgias.
 • Vacinação - Preço Padrão:R$60,00, Para Cães: Vacina antirrábica, Vacina polivalente (V8 ou V10), Vacina contra a gripe canina, Vacina contra a giardíase, Vacina contra a leishmaniose e Vacina da Raiva.
 • Venda de Rações - Foster, Magnus, Special Cat, Special Dog, Pedigree, Premier, Nutrive e Whiskas.
 • Venda de Produtos - Casinhas, Briquedos, Ossos, Chalesco(Arranhador), etc.
 
-🛒 **ONDE ENCONTRAR NO SITE:**
+🛒 ONDE ENCONTRAR NO SITE:
 • Página "Curiosidades" - A pagina curiosidades oferece ajuda a você, que não sabe qual raça combina com você ou qual é a ração mais adequada para o seu pet, Para fazer os formulários, basta selecionar o tipo de residência em que reside, o quanto de tempo você possui para os cuidados do seu pet, o tamanho da raça desejada, frequência da queda de pelo e o seu temperamento Já o segundo, selecione a raça do cão e digite a sua idade.
 
 • Página "Serviços" - Nossos principais serviços incluem a pega e entrega do seu animal diretamente em sua residência.
@@ -121,7 +138,7 @@ Oferecemos serviços de pet shop, banho e tosa, vacinação, consultas médicas 
 
 • Página "Agendar Consulta" - Vou até a parte de reservar um horário, depois seleciono o serviço desejado, em seguida escolho a data e o horario, informo se quero que o animal seja buscado em casa ou não, e, por fim, preencho meu nome e e-mail. Pronto — a reserva está feita!
 
-💡 **INFORMAÇÕES ESPECÍFICAS:**
+💡 INFORMAÇÕES ESPECÍFICAS:
 Diferencial é a busca e entrega dos animais.`;
 
 // ✅ FUNÇÕES AUXILIARES
@@ -136,12 +153,10 @@ async function getDBConnection() {
   }
 }
 
-// ✅ CONFIGURAR FUSO HORÁRIO DO BANCO
 async function configurarTimezone() {
   let connection;
   try {
     connection = await getDBConnection();
-    // Configurar para horário de Brasília
     await connection.execute("SET time_zone = '-03:00'");
     console.log('✅ Timezone configurado para America/Sao_Paulo (-03:00)');
   } catch (error) {
@@ -256,15 +271,14 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// ✅ FUNÇÃO PARA ATUALIZAR A TABELA PEDIDOS NO RAILWAY
+// ✅ FUNÇÃO PARA ATUALIZAR A TABELA PEDIDOS
 async function atualizarTabelaPedidos() {
   let connection;
   try {
     connection = await getDBConnection();
     
-    console.log('🔄 Verificando estrutura da tabela pedidos no Railway...');
+    console.log('🔄 Verificando estrutura da tabela pedidos...');
     
-    // Verificar colunas existentes
     const columnsToCheck = [
       'metodo_pagamento',
       'frete', 
@@ -1538,19 +1552,19 @@ app.use((req, res) => {
 
 // ✅ INICIALIZAÇÃO DO SERVIDOR
 app.listen(PORT, async () => {
-  console.log(`\n🚀 Pet.Net API rodando em http://localhost:${PORT}`);
+  console.log(`\n🚀 Pet.Net API rodando na porta ${PORT}`);
   console.log('📊 Inicializando banco de dados...');
   
   try {
     await createTables();
-    await configurarTimezone(); // ✅ NOVA FUNÇÃO
+    await configurarTimezone();
     await atualizarTabelaPedidos();
     console.log('✅ Sistema inicializado com sucesso!');
-    console.log('🐾 PetGPT está online e pronta para ajudar!');
-    console.log('💳 Sistema de pagamentos configurado');
-    console.log('📧 Sistema de emails funcionando');
-    console.log('🕒 FUSO HORÁRIO CONFIGURADO: America/Sao_Paulo (-03:00)');
+    console.log(`🔗 URL: http://localhost:${PORT}`);
+    console.log('🐾 PetGPT está online!');
   } catch (error) {
     console.error('❌ Erro na inicialização:', error);
   }
 });
+
+module.exports = app;
